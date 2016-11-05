@@ -90,6 +90,7 @@ int maxthreads = Runtime.getRuntime().availableProcessors();
         }
 ----
 
-The HTTP client is not complete. Many Elasticsearch actions are missing.
+The HTTP client is not complete yet. Many Elasticsearch actions are missing.
 
-You are welcome to
+You are welcome to send pull requests at https://github.com/jprante/elasticsearch-client-http
+if you like to improve this project.
