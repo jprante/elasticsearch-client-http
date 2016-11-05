@@ -190,34 +190,32 @@ public class HttpBulkProcessor implements Flushable, Closeable {
 
     // (currently) needs to be executed under a lock
     private void execute() {
-        final BulkRequest bulkRequest = this.bulkRequest;
+        final BulkRequest request = this.bulkRequest;
         final long executionId = executionIdGen.incrementAndGet();
-
         this.bulkRequest = new BulkRequest();
-
         if (concurrentRequests == 0) {
             // execute in a blocking fashion...
             boolean afterCalled = false;
             try {
-                listener.beforeBulk(executionId, bulkRequest);
-                BulkResponse bulkItemResponses = client.execute(BulkAction.INSTANCE, bulkRequest).actionGet();
+                listener.beforeBulk(executionId, request);
+                BulkResponse bulkItemResponses = client.execute(BulkAction.INSTANCE, request).actionGet();
                 afterCalled = true;
-                listener.afterBulk(executionId, bulkRequest, bulkItemResponses);
+                listener.afterBulk(executionId, request, bulkItemResponses);
             } catch (Exception e) {
                 if (!afterCalled) {
-                    listener.afterBulk(executionId, bulkRequest, e);
+                    listener.afterBulk(executionId, request, e);
                 }
             }
         } else {
             boolean success = false;
             try {
-                listener.beforeBulk(executionId, bulkRequest);
+                listener.beforeBulk(executionId, request);
                 semaphore.acquire();
-                client.execute(BulkAction.INSTANCE, bulkRequest, new ActionListener<BulkResponse>() {
+                client.execute(BulkAction.INSTANCE, request, new ActionListener<BulkResponse>() {
                     @Override
                     public void onResponse(BulkResponse response) {
                         try {
-                            listener.afterBulk(executionId, bulkRequest, response);
+                            listener.afterBulk(executionId, request, response);
                         } finally {
                             semaphore.release();
                         }
@@ -226,7 +224,7 @@ public class HttpBulkProcessor implements Flushable, Closeable {
                     @Override
                     public void onFailure(Throwable e) {
                         try {
-                            listener.afterBulk(executionId, bulkRequest, e);
+                            listener.afterBulk(executionId, request, e);
                         } finally {
                             semaphore.release();
                         }
@@ -234,10 +232,10 @@ public class HttpBulkProcessor implements Flushable, Closeable {
                 });
                 success = true;
             } catch (InterruptedException e) {
-                Thread.interrupted();
-                listener.afterBulk(executionId, bulkRequest, e);
-            } catch (Throwable t) {
-                listener.afterBulk(executionId, bulkRequest, t);
+                Thread.currentThread().interrupt();
+                listener.afterBulk(executionId, request, e);
+            } catch (Exception t) {
+                listener.afterBulk(executionId, request, t);
             } finally {
                 if (!success) {
                     semaphore.release();

@@ -83,10 +83,10 @@ public class HttpBulkClientTest extends NodeTestUtils {
                 .url(new URL("http://127.0.0.1:9200"))
                 .build();
         client.newIndex("test");
-        if (client.hasThrowable()) {
-            logger.error("error", client.getThrowable());
+        if (client.hasException()) {
+            logger.error("error", client.getException());
         }
-        assertFalse(client.hasThrowable());
+        assertFalse(client.hasException());
         client.shutdown();
     }
 
@@ -100,10 +100,10 @@ public class HttpBulkClientTest extends NodeTestUtils {
             client.index("test", "test", "1", "{ \"name\" : \"Hello World\"}"); // single doc ingest
             client.flushIngest();
             client.waitForResponses(TimeValue.timeValueSeconds(30));
-            if (client.hasThrowable()) {
-                logger.error("error", client.getThrowable());
+            if (client.hasException()) {
+                logger.error("error", client.getException());
             }
-            assertFalse(client.hasThrowable());
+            assertFalse(client.hasException());
             client.refreshIndex("test");
             SearchRequestBuilder searchRequestBuilder = new SearchRequestBuilder(client.client(), SearchAction.INSTANCE)
                     .setIndices("test")
@@ -134,10 +134,10 @@ public class HttpBulkClientTest extends NodeTestUtils {
             }
             client.flushIngest();
             client.waitForResponses(TimeValue.timeValueSeconds(30));
-            if (client.hasThrowable()) {
-                logger.error("error", client.getThrowable());
+            if (client.hasException()) {
+                logger.error("error", client.getException());
             }
-            assertFalse(client.hasThrowable());
+            assertFalse(client.hasException());
             client.refreshIndex("test");
             SearchRequestBuilder searchRequestBuilder = new SearchRequestBuilder(client.client(), SearchAction.INSTANCE)
                     .setIndices("test")
@@ -168,13 +168,11 @@ public class HttpBulkClientTest extends NodeTestUtils {
                     EsExecutors.daemonThreadFactory("http-bulk-nodeclient-test"));
             final CountDownLatch latch = new CountDownLatch(maxthreads);
             for (int i = 0; i < maxthreads; i++) {
-                pool.execute(new Runnable() {
-                    public void run() {
-                        for (int i = 0; i < maxloop; i++) {
-                            client.index("test", "test", null, "{ \"name\" : \"" + randomString(32) + "\"}");
-                        }
-                        latch.countDown();
+                pool.execute(() -> {
+                    for (int j = 0; j < maxloop; j++) {
+                        client.index("test", "test", null, "{ \"name\" : \"" + randomString(32) + "\"}");
                     }
+                    latch.countDown();
                 });
             }
             logger.info("waiting for max 30 seconds...");
@@ -186,10 +184,10 @@ public class HttpBulkClientTest extends NodeTestUtils {
             pool.shutdown();
             logger.info("pool is shut down");
             client.stopBulk("test", 1000);
-            if (client.hasThrowable()) {
-                logger.error("error", client.getThrowable());
+            if (client.hasException()) {
+                logger.error("error", client.getException());
             }
-            assertFalse(client.hasThrowable());
+            assertFalse(client.hasException());
             client.refreshIndex("test");
             SearchRequestBuilder searchRequestBuilder = new SearchRequestBuilder(client.client(), SearchAction.INSTANCE)
                     .setIndices("test")

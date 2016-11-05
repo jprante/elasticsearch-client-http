@@ -7,7 +7,6 @@ import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.action.ActionResponse;
 import org.elasticsearch.action.GenericAction;
 import org.elasticsearch.action.support.PlainActionFuture;
-import org.elasticsearch.common.ParseFieldMatcher;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.ESLoggerFactory;
@@ -27,30 +26,27 @@ import java.net.URL;
 import static org.elasticsearch.action.support.PlainActionFuture.newFuture;
 
 /**
- * @param <Request> the request type
- * @param <Response> the response type
+ * @param <R> the request type
+ * @param <T> the response type
  */
-public abstract class HttpAction<Request extends ActionRequest<Request>, Response extends ActionResponse> {
+public abstract class HttpAction<R extends ActionRequest<R>, T extends ActionResponse> {
 
     protected final ESLogger logger = ESLoggerFactory.getLogger(getClass().getName());
     protected Settings settings;
-    private String actionName;
-    private ParseFieldMatcher parseFieldMatcher;
 
     protected void setSettings(Settings settings) {
         this.settings = settings;
-        this.parseFieldMatcher = new ParseFieldMatcher(settings);
     }
 
-    public abstract GenericAction<Request, Response> getActionInstance();
+    public abstract GenericAction<R, T> getActionInstance();
 
-    public final ActionFuture<Response> execute(HttpContext<Request, Response> httpContext) {
-        PlainActionFuture<Response> future = newFuture();
+    public final ActionFuture<T> execute(HttpContext<R, T> httpContext) {
+        PlainActionFuture<T> future = newFuture();
         execute(httpContext, future);
         return future;
     }
 
-    public final void execute(HttpContext<Request, Response> httpContext, ActionListener<Response> listener) {
+    public final void execute(HttpContext<R, T> httpContext, ActionListener<T> listener) {
         ActionRequestValidationException validationException = httpContext.request.validate();
         if (validationException != null) {
             listener.onFailure(validationException);
@@ -60,9 +56,9 @@ public abstract class HttpAction<Request extends ActionRequest<Request>, Respons
         httpContext.millis = System.currentTimeMillis();
         try {
             doExecute(httpContext);
-        } catch (Throwable t) {
-            logger.error("exception during http action execution", t);
-            listener.onFailure(t);
+        } catch (Exception e) {
+            logger.error("exception during http action execution", e);
+            listener.onFailure(e);
         }
     }
 
@@ -104,12 +100,12 @@ public abstract class HttpAction<Request extends ActionRequest<Request>, Respons
         return request;
     }
 
-    protected void doExecute(final HttpContext<Request, Response> httpContext) {
+    protected void doExecute(final HttpContext<R, T> httpContext) {
         httpContext.getChannel().write(httpContext.getHttpRequest());
     }
 
-    protected abstract HttpRequest createHttpRequest(URL base, Request request) throws IOException;
+    protected abstract HttpRequest createHttpRequest(URL base, R request) throws IOException;
 
-    protected abstract Response createResponse(HttpContext<Request, Response> httpContext) throws IOException;
+    protected abstract T createResponse(HttpContext<R, T> httpContext) throws IOException;
 
 }

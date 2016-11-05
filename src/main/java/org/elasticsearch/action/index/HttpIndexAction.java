@@ -32,7 +32,6 @@ public class HttpIndexAction extends HttpAction<IndexRequest, IndexResponse> {
         BytesReference ref = new ChannelBufferBytesReference(httpResponse.getContent());
         Map<String, Object> map = JsonXContent.jsonXContent.createParser(ref).map();
         logger.info("{}", map);
-        IndexResponse indexResponse = new IndexResponse();
-        return indexResponse;
+        return new IndexResponse();
     }
 }

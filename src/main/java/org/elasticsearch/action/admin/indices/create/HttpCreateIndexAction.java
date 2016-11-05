@@ -28,19 +28,15 @@ public class HttpCreateIndexAction extends HttpAction<CreateIndexRequest, Create
     }
 
     @Override
-    protected CreateIndexResponse createResponse(HttpContext<CreateIndexRequest, CreateIndexResponse> httpContext) {
+    protected CreateIndexResponse createResponse(HttpContext<CreateIndexRequest, CreateIndexResponse> httpContext)
+            throws IOException {
         if (httpContext == null) {
             throw new IllegalStateException("no http context");
         }
         HttpResponse httpResponse = httpContext.getHttpResponse();
-        try {
-            BytesReference ref = new ChannelBufferBytesReference(httpResponse.getContent());
-            Map<String, Object> map = JsonXContent.jsonXContent.createParser(ref).map();
-            boolean acknowledged = map.containsKey("acknowledged") ? (Boolean) map.get("acknowledged") : false;
-            return new CreateIndexResponse(acknowledged);
-        } catch (IOException e) {
-            // ignore
-        }
-        return null;
+        BytesReference ref = new ChannelBufferBytesReference(httpResponse.getContent());
+        Map<String, Object> map = JsonXContent.jsonXContent.createParser(ref).map();
+        boolean acknowledged = map.containsKey("acknowledged") && (Boolean) map.get("acknowledged");
+        return new CreateIndexResponse(acknowledged);
     }
 }

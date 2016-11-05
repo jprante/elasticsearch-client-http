@@ -2,7 +2,6 @@ package org.elasticsearch.action.search;
 
 import org.elasticsearch.client.http.HttpAction;
 import org.elasticsearch.client.http.HttpContext;
-import org.elasticsearch.client.http.Strings;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.bytes.ChannelBufferBytesReference;
 import org.elasticsearch.common.xcontent.json.JsonXContent;
@@ -30,12 +29,9 @@ public class HttpSearchAction extends HttpAction<SearchRequest, SearchResponse> 
 
     private static final String SCROLL_ID = "_scroll_id";
     private static final String TOOK = "took";
-    private static final String TIMED_OUT = "timed_out";
     private static final String SHARDS = "_shards";
     private static final String TOTAL = "total";
     private static final String SUCCESSFUL = "successful";
-    private static final String FAILED = "failed";
-    private static final String FAILURES = "failures";
     private static final String HITS = "hits";
     private static final String MAXSCORE = "max_score";
 
@@ -46,7 +42,7 @@ public class HttpSearchAction extends HttpAction<SearchRequest, SearchResponse> 
 
     @Override
     protected HttpRequest createHttpRequest(URL url, SearchRequest request) throws IOException {
-        String index = request.indices() != null ? "/" + Strings.join(",", request.indices()) : "";
+        String index = request.indices() != null ? "/" + String.join(",", request.indices()) : "";
         return newRequest(HttpMethod.POST, url, index + "/_search", request.extraSource());
     }
 
@@ -73,18 +69,17 @@ public class HttpSearchAction extends HttpAction<SearchRequest, SearchResponse> 
             successfulShards = shards.containsKey(SUCCESSFUL) ? (Integer) shards.get(SUCCESSFUL) : -1;
         }
         int tookInMillis = map.containsKey(TOOK) ? (Integer) map.get(TOOK) : -1;
-        ShardSearchFailure[] shardFailures = parseShardFailures(map);
+        ShardSearchFailure[] shardFailures = null;
         return new SearchResponse(internalSearchResponse, scrollId, totalShards, successfulShards, tookInMillis, shardFailures);
     }
 
     private InternalSearchResponse parseInternalSearchResponse(Map<String, ?> map) {
         InternalSearchHits internalSearchHits = parseInternalSearchHits(map);
-        InternalAggregations internalAggregations = parseInternalAggregations(map);
-        Suggest suggest = parseSuggest(map);
+        InternalAggregations internalAggregations = null;
+        Suggest suggest = null;
         InternalProfileShardResults internalProfileShardResults = null;
         Boolean timeout = false;
         Boolean terminatedEarly = false;
-        // TODO
         return new InternalSearchResponse(internalSearchHits,
                 internalAggregations,
                 suggest,
@@ -96,38 +91,19 @@ public class HttpSearchAction extends HttpAction<SearchRequest, SearchResponse> 
     @SuppressWarnings("unchecked")
     private InternalSearchHits parseInternalSearchHits(Map<String, ?> map) {
         // InternalSearchHits(InternalSearchHit[] hits, long totalHits, float maxScore)
-        InternalSearchHit[] internalSearchHits = parseInternalSearchHit(map);
-        map = (Map<String, ?>) map.get(HITS);
-        long totalHits = map != null && map.containsKey(TOTAL) ? (Integer) map.get(TOTAL) : -1L;
-        double maxScore = map != null && map.containsKey(MAXSCORE) ? (Double) map.get(MAXSCORE) : 0.0f;
+        InternalSearchHit[] internalSearchHits = parseInternalSearchHit();
+        Map<String, ?> internalMap = (Map<String, ?>) map.get(HITS);
+        long totalHits = internalMap != null && internalMap.containsKey(TOTAL) ? (Integer) internalMap.get(TOTAL) : -1L;
+        double maxScore = internalMap != null && internalMap.containsKey(MAXSCORE) ? (Double) internalMap.get(MAXSCORE) : 0.0f;
         return new InternalSearchHits(internalSearchHits, totalHits, (float) maxScore);
     }
 
     @SuppressWarnings("unchecked")
-    private InternalSearchHit[] parseInternalSearchHit(Map<String, ?> map) {
-        // public InternalSearchHit(int docId, String id, Text type, Map<String, SearchHitField> fields)
+    private InternalSearchHit[] parseInternalSearchHit() {
+        // InternalSearchHit(int docId, String id, Text type, Map<String, SearchHitField> fields)
         List<InternalSearchHit> list = new LinkedList<>();
-        Map<String, ?> hitmap = (Map<String, ?>) map.get(HITS);
-        if (hitmap != null) {
-            List<Map<String, ?>> hits = (List<Map<String, ?>>) hitmap.get(HITS);
-        }
-        // TODO
         return list.toArray(new InternalSearchHit[list.size()]);
     }
 
-    // TODO
-    private InternalAggregations parseInternalAggregations(Map<String, ?> map) {
-        return null;
-    }
-
-    // TODO
-    private Suggest parseSuggest(Map<String, ?> map) {
-        return null;
-    }
-
-    // TODO
-    private ShardSearchFailure[] parseShardFailures(Map<String, ?> map) {
-        return ShardSearchFailure.EMPTY_ARRAY;
-    }
 }
 

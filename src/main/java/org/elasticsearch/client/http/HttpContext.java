@@ -10,30 +10,30 @@ import org.jboss.netty.handler.codec.http.HttpResponse;
 /**
  * HTTP context.
  *
- * @param <Request> request type
- * @param <Response> response type
+ * @param <R> request type
+ * @param <T> response type
  */
-public class HttpContext<Request extends ActionRequest<Request>, Response extends ActionResponse> {
+public class HttpContext<R extends ActionRequest<R>, T extends ActionResponse> {
 
-    final Request request;
-    private final HttpAction<Request, Response> httpAction;
-    ActionListener<Response> listener;
+    final R request;
+    private final HttpAction<R, T> httpAction;
+    ActionListener<T> listener;
     HttpRequest httpRequest;
     long millis;
     private Channel channel;
     private HttpResponse httpResponse;
 
-    HttpContext(HttpAction<Request, Response> httpAction, ActionListener<Response> listener, Request request) {
+    HttpContext(HttpAction<R, T> httpAction, ActionListener<T> listener, R request) {
         this.httpAction = httpAction;
         this.listener = listener;
         this.request = request;
     }
 
-    public HttpAction<Request, Response> getHttpAction() {
+    public HttpAction<R, T> getHttpAction() {
         return httpAction;
     }
 
-    public ActionListener<Response> getListener() {
+    public ActionListener<T> getListener() {
         return listener;
     }
 

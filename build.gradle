@@ -74,6 +74,10 @@ task integrationTest(type: Test) {
     outputs.upToDateWhen { false }
     systemProperty 'path.home', projectDir.absolutePath
     testLogging.showStandardStreams = true
+    jacoco {
+        destinationFile = file("$buildDir/jacoco/integrationTest.exec")
+        classDumpFile = file("$buildDir/jacoco/integrationTest")
+    }
 }
 
 integrationTest.mustRunAfter test

@@ -93,21 +93,16 @@ public class HttpBulkAction extends HttpAction<BulkRequest, BulkResponse> {
 
     @Override
     @SuppressWarnings("unchecked")
-    protected BulkResponse createResponse(HttpContext<BulkRequest, BulkResponse> httpContext) {
+    protected BulkResponse createResponse(HttpContext<BulkRequest, BulkResponse> httpContext) throws IOException {
         if (httpContext == null) {
             throw new IllegalStateException("no http context");
         }
         HttpResponse httpResponse = httpContext.getHttpResponse();
-        try {
-            BytesReference ref = new ChannelBufferBytesReference(httpResponse.getContent());
-            Map<String, Object> map = JsonXContent.jsonXContent.createParser(ref).map();
-            long tookInMillis = map.containsKey("took") ? (Integer) map.get("took") : -1L;
-            BulkItemResponse[] responses = parseItems((List<Map<String, ?>>) map.get("items"));
-            return new BulkResponse(responses, tookInMillis);
-        } catch (IOException e) {
-            //
-        }
-        return null;
+        BytesReference ref = new ChannelBufferBytesReference(httpResponse.getContent());
+        Map<String, Object> map = JsonXContent.jsonXContent.createParser(ref).map();
+        long tookInMillis = map.containsKey("took") ? (Integer) map.get("took") : -1L;
+        BulkItemResponse[] responses = parseItems((List<Map<String, ?>>) map.get("items"));
+        return new BulkResponse(responses, tookInMillis);
     }
 
     @SuppressWarnings("unchecked")

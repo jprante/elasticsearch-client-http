@@ -2,7 +2,6 @@ package org.elasticsearch.action.admin.indices.refresh;
 
 import org.elasticsearch.client.http.HttpAction;
 import org.elasticsearch.client.http.HttpContext;
-import org.elasticsearch.client.http.Strings;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.bytes.ChannelBufferBytesReference;
 import org.elasticsearch.common.xcontent.json.JsonXContent;
@@ -25,25 +24,21 @@ public class HttpRefreshIndexAction extends HttpAction<RefreshRequest, RefreshRe
 
     @Override
     protected HttpRequest createHttpRequest(URL url, RefreshRequest request) {
-        String index = request.indices() != null ? "/" + Strings.join(",", request.indices()) : "";
+        String index = request.indices() != null ? "/" + String.join(",", request.indices()) : "";
         return newPostRequest(url, index + "/_refresh", null);
     }
 
     @Override
-    protected RefreshResponse createResponse(HttpContext<RefreshRequest, RefreshResponse> httpContext) {
+    protected RefreshResponse createResponse(HttpContext<RefreshRequest, RefreshResponse> httpContext) throws IOException {
         if (httpContext == null) {
             throw new IllegalStateException("no http context");
         }
         HttpResponse httpResponse = httpContext.getHttpResponse();
-        try {
-            BytesReference ref = new ChannelBufferBytesReference(httpResponse.getContent());
-            Map<String, Object> map = JsonXContent.jsonXContent.createParser(ref).map();
-            logger.info("{}", map);
-            //  RefreshResponse(int totalShards, int successfulShards, int failedShards, List<ShardOperationFailedException> shardFailures) {
-            return new RefreshResponse();
-        } catch (IOException e) {
-            //
-        }
-        return null;
+        BytesReference ref = new ChannelBufferBytesReference(httpResponse.getContent());
+        Map<String, Object> map = JsonXContent.jsonXContent.createParser(ref).map();
+        logger.info("{}", map);
+        //  RefreshResponse(int totalShards, int successfulShards, int failedShards,
+        //     List<ShardOperationFailedException> shardFailures) {
+        return new RefreshResponse();
     }
 }

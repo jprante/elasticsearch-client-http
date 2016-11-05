@@ -73,8 +73,8 @@ public class HttpClient extends AbstractClient {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
-    public <Request extends ActionRequest, Response extends ActionResponse, RequestBuilder extends ActionRequestBuilder<Request, Response, RequestBuilder>>
-    void doExecute(Action<Request, Response, RequestBuilder> action, Request request, ActionListener<Response> listener) {
+    public <R extends ActionRequest, T extends ActionResponse, B extends ActionRequestBuilder<R, T, B>>
+    void doExecute(Action<R, T, B> action, R request, ActionListener<T> listener) {
         HttpAction httpAction = actionMap.get(action);
         if (httpAction == null) {
             throw new IllegalStateException("failed to find http action [" + action + "] to execute");
@@ -100,8 +100,6 @@ public class HttpClient extends AbstractClient {
     }
 
     public static class Builder {
-
-        private HttpClient client;
 
         private Settings settings = Settings.EMPTY;
 
@@ -143,7 +141,7 @@ public class HttpClient extends AbstractClient {
             try {
                 this.url = settings.get("url") != null ? new URL(settings.get("url")) : url;
                 if (url == null) {
-                    this.host = settings.get("host", "127.0.0.1");
+                    this.host = settings.get("host", "localhost");
                     this.port = settings.getAsInt("port", 9200);
                 }
                 if (url == null && host != null && port != null) {
@@ -156,7 +154,7 @@ public class HttpClient extends AbstractClient {
                 throw new IllegalArgumentException("no base URL given");
             }
             ThreadPool threadpool = new ThreadPool("http_client_pool");
-            client = new HttpClient(settings, threadpool, Headers.EMPTY, url);
+            HttpClient client = new HttpClient(settings, threadpool, Headers.EMPTY, url);
             ServiceLoader<HttpAction> httpActionServiceLoader = ServiceLoader.load(HttpAction.class, classLoader);
             for (HttpAction httpAction : httpActionServiceLoader) {
                 httpAction.setSettings(settings);
@@ -168,30 +166,33 @@ public class HttpClient extends AbstractClient {
 
     private class HttpClientPipelineFactory implements ChannelPipelineFactory {
 
+        @Override
         public ChannelPipeline getPipeline() throws Exception {
             ChannelPipeline pipeline = Channels.pipeline();
             pipeline.addLast("codec", new HttpClientCodec());
-            pipeline.addLast("aggregator", new HttpChunkAggregator(settings.getAsInt("http.client.maxchunksize", 10 * 1024 * 1024)));
+            pipeline.addLast("aggregator",
+                    new HttpChunkAggregator(settings.getAsInt("http.client.maxchunksize", 10 * 1024 * 1024)));
             pipeline.addLast("inflater", new HttpContentDecompressor());
             pipeline.addLast("handler", new HttpResponseHandler<>());
             return pipeline;
         }
     }
 
-    private class HttpResponseHandler<Request extends ActionRequest<Request>, Response extends ActionResponse> extends SimpleChannelUpstreamHandler {
+    private class HttpResponseHandler<R extends ActionRequest<R>, T extends ActionResponse>
+            extends SimpleChannelUpstreamHandler {
 
         @SuppressWarnings("unchecked")
         @Override
         public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) throws Exception {
-            HttpContext<Request, Response> httpContext = httpContextMap.get(ctx.getChannel());
+            HttpContext<R, T> httpContext = httpContextMap.get(ctx.getChannel());
             if (httpContext == null) {
                 throw new IllegalStateException("no context for channel?");
             }
             try {
                 if (e.getMessage() instanceof HttpResponse) {
                     HttpResponse httpResponse = (HttpResponse) e.getMessage();
-                    HttpAction<Request, Response> action = httpContext.getHttpAction();
-                    ActionListener<Response> listener = httpContext.getListener();
+                    HttpAction<R, T> action = httpContext.getHttpAction();
+                    ActionListener<T> listener = httpContext.getListener();
                     httpContext.setHttpResponse(httpResponse);
                     if (httpResponse.getContent().readable() && listener != null && action != null) {
                         listener.onResponse(action.createResponse(httpContext));
@@ -204,8 +205,9 @@ public class HttpClient extends AbstractClient {
         }
 
         @SuppressWarnings("unchecked")
+        @Override
         public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception {
-            HttpContext<Request, Response> httpContext = httpContextMap.get(ctx.getChannel());
+            HttpContext<R, T> httpContext = httpContextMap.get(ctx.getChannel());
             try {
                 if (httpContext != null && httpContext.getListener() != null) {
                     httpContext.getListener().onFailure(e.getCause());
