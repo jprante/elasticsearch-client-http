@@ -1,0 +1,97 @@
+# Elasticsearch HTTP client
+
+image:https://api.travis-ci.org/jprante/elasticsearch-client-http.svg[title="Build status", link="https://travis-ci.org/jprante/elasticsearch-client-http/"]
+image:https://img.shields.io/sonar/http/nemo.sonarqube.com/org.xbib.elasticsearch%3Aelasticsearch-client-http/coverage.svg?style=flat-square[title="Coverage", link="https://sonarqube.com/dashboard/index?id=org.xbib.elasticsearch%3Aelasticsearch-client-http"]
+image:https://maven-badges.herokuapp.com/maven-central/org.xbib.elasticsearch/elasticsearch-client-http/badge.svg[title="Maven Central", link="http://search.maven.org/#search%7Cga%7C1%7Cxbib%20elasticsearch-client-http"]
+image:https://img.shields.io/badge/License-Apache%202.0-blue.svg[title="Apache License 2.0", link="https://opensource.org/licenses/Apache-2.0"]
+
+This is a an implementation of a Java HTTP client for Elasticsearch. The client API is compatible to the Elasticsearch TransportClient API.
+
+Here is an example
+
+[source, java]
+----
+        try (HttpClient client = HttpClient.builder()
+                .url(new URL("http://127.0.0.1:9200"))
+                .build()) {
+            CreateIndexRequestBuilder createIndexRequestBuilder =
+                    new CreateIndexRequestBuilder(client, CreateIndexAction.INSTANCE).setIndex("test");
+            createIndexRequestBuilder.execute().actionGet();
+            IndexRequestBuilder indexRequestBuilder =
+                    new IndexRequestBuilder(client, IndexAction.INSTANCE)
+                            .setIndex("test")
+                            .setType("type")
+                            .setId("1")
+                            .setSource(jsonBuilder().startObject().field("name", "Hello World").endObject());
+            indexRequestBuilder.execute().actionGet();
+            RefreshRequestBuilder refreshRequestBuilder =
+                    new RefreshRequestBuilder(client, RefreshAction.INSTANCE)
+                            .setIndices("test");
+            refreshRequestBuilder.execute().actionGet();
+            SearchRequestBuilder searchRequestBuilder = new SearchRequestBuilder(client, SearchAction.INSTANCE)
+                    .setIndices("test")
+                    .setQuery(QueryBuilders.matchAllQuery()).setSize(0);
+            assertTrue(searchRequestBuilder.execute().actionGet().getHits().getTotalHits() > 0);
+        }
+----
+
+There is also bulk support. Use the class `HttpBulkProcessor` which is compatible to Elasticsearch `BulkProcessor`.
+
+Or you can use `HttpBulkClient` like this
+
+[code,java]
+----
+int maxthreads = Runtime.getRuntime().availableProcessors();
+        int maxactions = MAX_ACTIONS;
+        final long maxloop = NUM_ACTIONS;
+        logger.info("HttpBulkNodeClient max={} maxactions={} maxloop={}", maxthreads, maxactions, maxloop);
+        final HttpBulkClient client = HttpBulkClient.builder()
+                .url(new URL("http://127.0.0.1:9200"))
+                .maxActionsPerRequest(maxactions)
+                .flushIngestInterval(TimeValue.timeValueSeconds(60))
+                .build();
+        try {
+            client.newIndex("test")
+                    .startBulk("test", -1);
+            ThreadPoolExecutor pool = EsExecutors.newFixed("http-bulk-nodeclient-test", maxthreads, 30,
+                    EsExecutors.daemonThreadFactory("http-bulk-nodeclient-test"));
+            final CountDownLatch latch = new CountDownLatch(maxthreads);
+            for (int i = 0; i < maxthreads; i++) {
+                pool.execute(new Runnable() {
+                    public void run() {
+                        for (int i = 0; i < maxloop; i++) {
+                            client.index("test", "test", null, "{ \"name\" : \"" + randomString(32) + "\"}");
+                        }
+                        latch.countDown();
+                    }
+                });
+            }
+            logger.info("waiting for max 30 seconds...");
+            latch.await(30, TimeUnit.SECONDS);
+            logger.info("flush...");
+            client.flushIngest();
+            client.waitForResponses(TimeValue.timeValueSeconds(30));
+            logger.info("got all responses, thread pool shutdown...");
+            pool.shutdown();
+            logger.info("pool is shut down");
+            client.stopBulk("test", 1000);
+            if (client.hasThrowable()) {
+                logger.error("error", client.getThrowable());
+            }
+            assertFalse(client.hasThrowable());
+            client.refreshIndex("test");
+            SearchRequestBuilder searchRequestBuilder = new SearchRequestBuilder(client.client(), SearchAction.INSTANCE)
+                    .setIndices("test")
+                    .setQuery(QueryBuilders.matchAllQuery()).setSize(0);
+            assertEquals(maxthreads * maxloop,
+                    searchRequestBuilder.execute().actionGet().getHits().getTotalHits());
+        } catch (NoNodeAvailableException e) {
+            logger.warn("skipping, no node available");
+        } finally {
+            client.shutdown();
+        }
+----
+
+The HTTP client is not complete. Many Elasticsearch actions are missing.
+
+You are welcome to
